@@ -6,3 +6,5 @@ matplotlib
 mediapipe
 google-generativeai
 requests
+opencv-python-headless
+
