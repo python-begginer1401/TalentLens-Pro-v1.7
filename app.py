@@ -1207,7 +1207,7 @@ def home_page():
     
     with col1:
         st.markdown("""
-        ## Welcome to Soccer Talent Analysis Platform
+        ## Welcome to TalentLens-Pro-v1.7 
         
         This professional tool uses computer vision and AI to analyze soccer player performance 
         from video footage. Upload videos of players and get detailed insights to inform 
