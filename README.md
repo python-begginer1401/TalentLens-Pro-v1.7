@@ -25,8 +25,6 @@ The platform offers multiple AI models for analysis:
 
 - **Google Gemini**: Google's advanced multimodal AI model can analyze both visual and contextual information for richer insights. Requires API key.
 
-- **DeepSeek**: Specialized model for detailed sports performance analysis with actionable insights for player development. Requires API key.
-
 - **Hugging Face LLaVa**: Vision-language model that combines image understanding with natural language processing for comprehensive analysis. Requires API key.
 
 ## Performance Metrics
@@ -83,7 +81,6 @@ The platform calculates and visualizes various performance metrics:
 To use the external AI models, you'll need to obtain the following API keys:
 
 - **Google Gemini**: Available from [Google AI Studio](https://ai.google.dev/)
-- **DeepSeek**: Available from [DeepSeek AI](https://www.deepseek.ai/)
 - **Hugging Face**: Available from [Hugging Face](https://huggingface.co/settings/tokens)
 
 ## Usage Guide
