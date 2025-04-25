@@ -15,6 +15,7 @@ from google.generativeai import GenerativeModel
 import google.generativeai as genai
 import requests
 
+
 # ===== UTILITIES =====
 
 # ===== POSE DETECTION =====
@@ -102,20 +103,16 @@ def analyze_video(video_file):
 def calculate_movement_metrics(landmarks_data):
     """
     Calculate movement metrics from pose landmarks
-    
-    Args:
-        landmarks_data: NumPy array of landmark coordinates
-        
-    Returns:
-        metrics: Dictionary of movement metrics
     """
-    if landmarks_data.size == 0:
-        # Return default metrics if no landmarks
+    # ---------- SAFETY GUARD ----------
+    if landmarks_data is None or (
+        hasattr(landmarks_data, "size") and landmarks_data.size == 0
+    ):
         return {
-            'speed': {'avg_foot_speed': 50, 'right_foot': 50, 'left_foot': 50},
-            'agility': {'direction_changes': 50, 'max_acceleration': 50},
-            'ball_control': {'hand_movement': 50},
-            'balance': {'stability': 50, 'posture_consistency': 50}
+            "speed":   {"avg_foot_speed": 50, "right_foot": 50, "left_foot": 50},
+            "agility": {"direction_changes": 50, "max_acceleration": 50},
+            "ball_control": {"hand_movement": 50},
+            "balance": {"stability": 50, "posture_consistency": 50},
         }
     
     try:
@@ -1754,6 +1751,16 @@ def compare_players():
                     player_info=p2_info_str,
                     api_key=api_keys.get(selected_model, "")
                 )
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.markdown(f"### {p1_name} – Individual Report")
+                    st.markdown(p1_analysis["summary"])      # Gemini / offline / HF output
+
+                with col2:
+                    st.markdown(f"### {p2_name} – Individual Report")
+                    st.markdown(p2_analysis["summary"])
                 
                 if p1_analysis and p2_analysis:
                     # Generate comparison
