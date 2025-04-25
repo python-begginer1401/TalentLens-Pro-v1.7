@@ -101,6 +101,10 @@ To use the external AI models, you'll need to obtain the following API keys:
 - [OpenCV](https://opencv.org/) for video processing
 - [Matplotlib](https://matplotlib.org/) for data visualization
 
+
+## Deplyed App
+- you can visit TalentLens Pro Live at (https://talentlens-pro-v17.streamlit.app/)
+
 ---
 
 Developed with ❤️ for the soccer community by the TalentLens team
