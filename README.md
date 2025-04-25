@@ -63,8 +63,9 @@ The platform calculates and visualizes various performance metrics:
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/soccer-analysis-platform.git
-   cd soccer-analysis-platform
+   git clone https://github.com/python-begginer1401/TalentLens-Pro-v1.7.git
+   cd TalentLens-Pro-v1.7
+
    ```
 
 2. Install dependencies:
