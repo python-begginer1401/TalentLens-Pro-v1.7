@@ -12,6 +12,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import io
 import mediapipe as mp
 from google.generativeai import GenerativeModel
+import google.generativeai as genai
 import requests
 
 # ===== UTILITIES =====
@@ -418,172 +419,67 @@ def get_offline_analysis(video_frames, landmarks, player_info, is_comparison=Fal
         'metrics': metrics
     }
 
-def analyze_with_gemini(video_frames, landmarks, player_info, api_key, is_comparison=False):
+def analyze_with_gemini(video_frames, landmarks, player_info,
+                        api_key, is_comparison=False):
     """
     Analyze player performance using Google's Gemini model
-    
-    Args:
-        video_frames: List of video frames with pose detection
-        landmarks: NumPy array of landmark data
-        player_info: String containing player information
-        api_key: Gemini API key
-        is_comparison: Boolean indicating if this is a comparison analysis
-        
-    Returns:
-        Dictionary containing analysis results
     """
     try:
-        # Calculate metrics from landmarks
-        metrics = {}
-        if landmarks is not None and len(landmarks) > 0:
-            metrics = calculate_movement_metrics(landmarks)
-        
-        # Configure Gemini
-        gemini = GenerativeModel('gemini-1.5-flash')
-        
-        # Prepare frames for analysis
-        frame_strings = []
-        if video_frames and len(video_frames) > 0:
-            for frame in video_frames[:5]:  # Sample frames
-                _, buffer = cv2.imencode('.jpg', frame)
-                frame_strings.append(
+        # configure the client with the key entered in the sidebar
+        genai.configure(api_key=api_key)
+
+        # metrics (unchanged)
+        metrics = calculate_movement_metrics(landmarks) \
+                  if landmarks is not None and len(landmarks) else {}
+
+        # build image parts in correct format
+        frame_parts = []
+        if video_frames:
+            for frame in video_frames[:5]:
+                _, buf = cv2.imencode(".jpg", frame)
+                frame_parts.append(
                     {
-                        "inlineData": {
-                            "mimeType": "image/jpeg",
-                            "data": base64.b64encode(buffer).decode('utf-8')
+                        "inline_data": {               # snake_case
+                            "mime_type": "image/jpeg",
+                            "data": base64.b64encode(buf).decode()
                         }
                     }
                 )
-        
-        # Create prompt based on whether this is a comparison or individual analysis
-        if is_comparison:
-            prompt = f"""
-            {player_info}
-            
-            Based on the above information comparing two soccer players,
-            provide a detailed analysis highlighting:
-            1. Relative strengths and weaknesses of each player
-            2. Potential best position for each player
-            3. Which player might be better suited for different team needs
-            4. Development potential for each player
-            
-            Format your response with markdown headings and bullet points.
-            """
-        else:
-            # Format metrics for inclusion in the prompt
-            metrics_str = json.dumps(metrics, indent=2) if metrics else "No metrics available"
-            
-            prompt = f"""
-            Analyze this soccer player's performance based on the following information:
-            
-            Player Info:
-            {player_info}
-            
-            Player Metrics:
-            {metrics_str}
-            
-            Also analyze any visible pose information from the provided images.
-            
-            Provide a detailed analysis covering:
-            1. Technical Skills (ball control, passing, shooting)
-            2. Physical Attributes (speed, agility, strength)
-            3. Tactical Awareness (positioning, decision making)
-            4. Potential Areas for Improvement
-            5. Overall Rating (1-10 scale)
-            
-            Format your response with markdown headings and bullet points.
-            """
-        
-        # Create content parts for the model
-        contents = [{"role": "user", "parts": [{"text": prompt}]}]
-        
-        # Add frames if available
-        if frame_strings:
-            for frame in frame_strings:
-                contents[0]["parts"].append(frame)
-        
-        # Generate response
-        response = gemini.generate_content(contents)
-        
-        return {
-            'summary': response.text,
-            'metrics': metrics
-        }
-    except Exception as e:
-        metrics = {}  # Placeholder if metrics wasn't defined
-        if landmarks is not None and len(landmarks) > 0:
-            metrics = calculate_movement_metrics(landmarks)
-        return {
-            'summary': f"Error analyzing with Gemini: {str(e)}",
-            'metrics': metrics
-        }
 
-def analyze_with_deepseek(video_frames, landmarks, player_info, api_key, is_comparison=False):
-    """
-    Analyze player performance using DeepSeek API
-    
-    Args:
-        video_frames: List of video frames with pose detection
-        landmarks: NumPy array of landmark data
-        player_info: String containing player information
-        api_key: DeepSeek API key
-        is_comparison: Boolean indicating if this is a comparison analysis
-        
-    Returns:
-        Dictionary containing analysis results
-    """
-    try:
-        # Calculate metrics from landmarks
-        metrics = {}
-        if landmarks is not None and len(landmarks) > 0:
-            metrics = calculate_movement_metrics(landmarks)
-        
-        # Prepare frames for analysis (convert to base64)
-        frame_strings = []
-        if video_frames and len(video_frames) > 0:
-            for frame in video_frames[:3]:  # Sample frames
-                _, buffer = cv2.imencode('.jpg', frame)
-                frame_strings.append(base64.b64encode(buffer).decode('utf-8'))
-        
-        # Create prompt based on whether this is a comparison or individual analysis
+        # text prompt
+        metrics_str = json.dumps(metrics, indent=2) if metrics else "No metrics available"
         if is_comparison:
-            prompt = f"""
-            {player_info}
-            
-            Based on the above information comparing two soccer players,
-            provide a detailed analysis highlighting:
-            1. Relative strengths and weaknesses of each player
-            2. Potential best position for each player
-            3. Which player might be better suited for different team needs
-            4. Development potential for each player
-            
-            Format your response with markdown headings and bullet points.
-            """
+            prompt = f"""{player_info}
+
+Based on the information comparing two soccer players, provide:
+1. Relative strengths and weaknesses
+2. Best position for each
+3. Suitability for different team needs
+4. Development potential
+
+Use markdown headings and bullet points."""
         else:
-            # Format metrics for inclusion in the prompt
-            metrics_str = json.dumps(metrics, indent=2) if metrics else "No metrics available"
-            
-            prompt = f"""
-            Analyze this soccer player's performance based on the following information:
-            
-            Player Info:
-            {player_info}
-            
-            Player Metrics:
-            {metrics_str}
-            
-            Also analyze any visible pose information from the provided images.
-            
-            Provide a detailed analysis covering:
-            1. Technical Skills (ball control, passing, shooting)
-            2. Physical Attributes (speed, agility, strength)
-            3. Tactical Awareness (positioning, decision making)
-            4. Potential Areas for Improvement
-            5. Overall Rating (1-10 scale)
-            
-            Format your response with markdown headings and bullet points.
-            """
-        
+            prompt = f"""Analyze this soccer player's performance.
+
+Player info:
+{player_info}
+
+Player metrics:
+{metrics_str}
+
+Cover technical skills, physical attributes, tactical awareness,
+areas to improve, and give an overall 1-10 rating."""
+
+        # send to Gemini
+        user_parts = [{"text": prompt}] + frame_parts
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content([{"role": "user", "parts": user_parts}])
+
+        return {"summary": response.text, "metrics": metrics}
+
+    except Exception as e:
+        return {"summary": f"Error analyzing with Gemini: {e}",
+                "metrics": metrics if 'metrics' in locals() else {}}
         # For simulation purposes (since we don't have actual DeepSeek API access)
         # we'll create a function that generates a synthetic response based on the metrics
         # In a real implementation, this would be an actual API call
@@ -718,96 +614,11 @@ def analyze_with_model(model_name, video_frames, landmarks, player_info, api_key
         return get_offline_analysis(video_frames, landmarks, player_info, is_comparison)
     elif model_name == "gemini":
         return analyze_with_gemini(video_frames, landmarks, player_info, api_key, is_comparison)
-    elif model_name == "deepseek":
-        return analyze_with_deepseek(video_frames, landmarks, player_info, api_key, is_comparison)
     elif model_name == "huggingface":
         return analyze_with_huggingface(video_frames, landmarks, player_info, api_key, is_comparison)
     else:
         # Default to offline analysis if model not recognized
         return get_offline_analysis(video_frames, landmarks, player_info, is_comparison)
-
-def generate_synthetic_deepseek_response(metrics, player_info, is_comparison=False):
-    """
-    Generate a simulated DeepSeek response based on metrics
-    (In a real implementation, this would be an actual API call)
-    
-    Args:
-        metrics: Dictionary of player metrics
-        player_info: String containing player information
-        is_comparison: Boolean indicating if this is a comparison analysis
-        
-    Returns:
-        String containing the analysis response
-    """
-    if is_comparison:
-        return """
-        # Comparative Analysis
-
-        ## Player Comparison Summary
-        The players demonstrate different strengths and weaknesses as shown in the metric charts.
-
-        ## Relative Strengths
-        - The metrics visualization provides a clear comparison between players
-        - Each player's unique attributes can be observed in the radar chart
-
-        ## Position Recommendations
-        - Position recommendations should be based on the relative strengths shown in the charts
-        - Consider the balance of technical and physical attributes
-
-        ## Development Pathways
-        - Training programs should be customized based on the areas requiring improvement
-        - Regular assessment using this tool can track progress over time
-        """
-    else:
-        # Get information from metrics
-        speed_score = metrics.get('speed', {}).get('avg_foot_speed', 50)
-        agility_score = (metrics.get('agility', {}).get('direction_changes', 50) + 
-                          metrics.get('agility', {}).get('max_acceleration', 50)) / 2
-        ball_control = metrics.get('ball_control', {}).get('hand_movement', 50)
-        balance = (metrics.get('balance', {}).get('stability', 50) + 
-                    metrics.get('balance', {}).get('posture_consistency', 50)) / 2
-        
-        # Get player info
-        info_dict = {}
-        for line in player_info.strip().split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                info_dict[key.strip()] = value.strip()
-        
-        name = info_dict.get('Name', 'Player')
-        position = info_dict.get('Position', 'Unknown')
-        
-        # Calculate overall rating
-        overall_rating = (speed_score + agility_score + ball_control + balance) / 4
-        overall_rating_scaled = max(1, min(10, overall_rating / 10))
-        
-        analysis = f"""
-        # DeepSeek Analysis: {name}
-        
-        ## Technical Skills Analysis
-        - Ball Control: {ball_control:.1f}/100 - {'Exceptional' if ball_control > 80 else 'Strong' if ball_control > 60 else 'Average' if ball_control > 40 else 'Requires development'}
-        - The player demonstrates {'excellent technical ability' if ball_control > 80 else 'good technical skills' if ball_control > 60 else 'adequate technical ability' if ball_control > 40 else 'technical limitations that require attention'}
-        - {'Recommend advanced technical drills' if ball_control > 80 else 'Recommend technical refinement exercises' if ball_control > 60 else 'Recommend focused technical training' if ball_control > 40 else 'Recommend fundamental technical development program'}
-        
-        ## Physical Attributes
-        - Speed: {speed_score:.1f}/100 - {'Elite' if speed_score > 80 else 'Above average' if speed_score > 60 else 'Average' if speed_score > 40 else 'Below average'}
-        - Agility: {agility_score:.1f}/100 - {'Elite' if agility_score > 80 else 'Above average' if agility_score > 60 else 'Average' if agility_score > 40 else 'Below average'}
-        - Balance: {balance:.1f}/100 - {'Elite' if balance > 80 else 'Above average' if balance > 60 else 'Average' if balance > 40 else 'Below average'}
-        
-        ## Position Suitability Analysis
-        - Current position: {position}
-        - {'This appears to be an ideal position based on the player attributes' if overall_rating_scaled > 7 else 'This position is suitable, but the player could also consider alternatives' if overall_rating_scaled > 5 else 'The player might benefit from exploring alternative positions'}
-        
-        ## Development Pathway
-        - Short-term focus: {'Technical refinement' if ball_control < speed_score and ball_control < agility_score else 'Speed development' if speed_score < ball_control and speed_score < agility_score else 'Agility enhancement'}
-        - Long-term development: {'Complete player development with balanced training' if overall_rating_scaled > 7 else 'Targeted improvement in specific areas based on metrics' if overall_rating_scaled > 5 else 'Fundamental skill development across all areas'}
-        
-        ## Overall Rating and Potential
-        - Current Rating: {overall_rating_scaled:.1f}/10
-        - Development Potential: {'High' if overall_rating_scaled > 7 or (overall_rating_scaled > 5 and int(info_dict.get('Age', '25')) < 23) else 'Moderate' if overall_rating_scaled > 5 else 'Requires significant development'}
-        """
-        
-        return analysis
 
 # ===== DATA PROCESSING =====
 def save_player_data(player_data):
@@ -1207,7 +1018,7 @@ def home_page():
     
     with col1:
         st.markdown("""
-        ## Welcome to TalentLens-Pro-v1.7 
+        ## Welcome to TalentLens-Pro 
         
         This professional tool uses computer vision and AI to analyze soccer player performance 
         from video footage. Upload videos of players and get detailed insights to inform 
@@ -1273,9 +1084,6 @@ def home_page():
     
     with col2:
         st.markdown("""
-        #### DeepSeek Analysis
-        Specialized model for detailed sports performance analysis with actionable insights for player development. Requires API key.
-        
         #### Hugging Face LLaVa
         Vision-language model that combines image understanding with natural language processing for comprehensive analysis. Requires API key.
         """)
@@ -1301,10 +1109,11 @@ def feature_card(title, description, icon, page):
         page: Target page name
     """
     st.markdown(f"""
-    <div style="padding: 1.5rem; border-radius: 0.5rem; border: 1px solid #eeeeee; background-color: #ffffff; height: 250px; position: relative; margin-bottom: 1rem;">
-        <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">{icon}</h1>
-        <h3 style="margin-top: 0;">{title}</h3>
-        <p style="color: #555555; height: 100px; overflow: auto;">{description}</p>
+        <div style="padding:1.5rem;border-radius:0.5rem;border:1px solid #eeeeee;
+            background-color:#ffffff;height:250px;position:relative;margin-bottom:1rem;">
+        <h1 style="font-size:2rem;margin-bottom:0.5rem;color:black;">{icon}</h1>
+        <h3 style="margin-top:0;color:black;">{title}</h3>
+        <p style="color:black;height:100px;overflow:auto;">{description}</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1374,7 +1183,7 @@ def create_sidebar():
     with st.sidebar:
         st.image("https://images.unsplash.com/photo-1519823038424-f8dbabca95f1", use_container_width=True)
         
-        st.title("⚽ Soccer Analysis")
+        st.title("⚽ TalentLens-Pro-v1.7")
         
         # Navigation
         st.subheader("Navigation")
@@ -1400,12 +1209,11 @@ def create_sidebar():
         
         selected_model = st.selectbox(
             "Choose AI Model",
-            ["offline", "gemini", "deepseek", "huggingface"],
-            index=["offline", "gemini", "deepseek", "huggingface"].index(st.session_state.get('selected_model', 'offline')),
+            ["offline", "gemini", "huggingface"],
+            index=["offline", "gemini", "huggingface"].index(st.session_state.get('selected_model', 'offline')),
             format_func=lambda x: {
                 "offline": "Offline Analysis",
                 "gemini": "Google Gemini",
-                "deepseek": "DeepSeek",
                 "huggingface": "Hugging Face LLaVa"
             }.get(x, x.title())
         )
@@ -1425,15 +1233,6 @@ def create_sidebar():
             )
             st.session_state.api_keys["gemini"] = api_keys["gemini"]
             
-        elif selected_model == "deepseek":
-            api_keys["deepseek"] = st.text_input(
-                "DeepSeek API Key",
-                type="password",
-                value=st.session_state.api_keys.get("deepseek", ""),
-                key="deepseek_api_key"
-            )
-            st.session_state.api_keys["deepseek"] = api_keys["deepseek"]
-            
         elif selected_model == "huggingface":
             api_keys["huggingface"] = st.text_input(
                 "Hugging Face API Key",
@@ -1447,7 +1246,7 @@ def create_sidebar():
         st.markdown("---")
         st.markdown("""
         ### About
-        Soccer Talent Analysis Platform uses computer vision and AI to help coaches, 
+        TalentLens-Pro-v1.7 uses computer vision and AI to help coaches, 
         scouts, and players analyze performance and identify areas for improvement.
         """)
     
@@ -1698,7 +1497,7 @@ def render_comparison_metrics(p1_analysis, p2_analysis, p1_name, p2_name):
 
 # Page configuration
 st.set_page_config(
-    page_title="Soccer Talent Analysis",
+    page_title="TalentLens Pro",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -1716,7 +1515,6 @@ if 'selected_model' not in st.session_state:
 if 'api_keys' not in st.session_state:
     st.session_state.api_keys = {
         "gemini": "",
-        "deepseek": "",
         "huggingface": ""
     }
 
@@ -1727,7 +1525,7 @@ selected_page, selected_model, api_keys = create_sidebar()
 def header():
     st.markdown("""
     <div style='text-align: center;'>
-        <h1>⚽ Soccer Talent Analysis Platform</h1>
+        <h1>TalentLens: Scout smarter – not harder!</h1>
         <p>Professional-grade player analysis powered by AI and computer vision</p>
     </div>
     """, unsafe_allow_html=True)
@@ -1776,7 +1574,7 @@ def player_analysis():
     analyze_button = st.button("Analyze Player", type="primary")
     
     if analyze_button and video_file:
-        if selected_model in ["gemini", "deepseek", "huggingface"] and not api_keys.get(selected_model):
+        if selected_model in ["gemini", "huggingface"] and not api_keys.get(selected_model):
             st.error(f"Please enter your {selected_model.title()} API key in the sidebar")
             return
             
